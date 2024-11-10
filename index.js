@@ -16,7 +16,14 @@ function decrypt(encryptedData) {
 
 app.post('/', async (req, res) => {
     try {
+        console.log("Request body:", req.body);
+
         const encryptedPayload = req.body.data;
+
+        if (!encryptedPayload) {
+            throw new Error("Missing encrypted data in the request body");
+        }
+
         const decryptedMessage = decrypt(encryptedPayload);
 
         const { identifier, content, embeds } = decryptedMessage;
