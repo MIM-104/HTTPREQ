@@ -19,13 +19,31 @@ function decrypt(encryptedText) {
 app.post('/webhook', async (req, res) => {
     try {
         const encryptedPayload = req.body.data;
-        const decryptedData = decrypt(encryptedPayload);
 
-        await fetch(discordWebhookUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: decryptedData,
-        });
+        if (!encryptedPayload || typeof encryptedPayload !== 'string') {
+            return res.status(400).send('Invalid encrypted data');
+        }
+
+        let decryptedData;
+        try {
+            decryptedData = decrypt(encryptedPayload);
+            let jsonPayload = JSON.parse(decryptedData);
+
+            const discordResponse = await fetch(discordWebhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(jsonPayload),
+            });
+
+            if (!discordResponse.ok) {
+                console.error('Failed to send to Discord:', discordResponse.statusText);
+                return res.status(500).send('Failed to forward to Discord');
+            }
+
+        } catch (err) {
+            console.error('Decryption or parsing failed', err);
+            return res.status(400).send('Invalid data or failed to parse decrypted payload');
+        }
 
         res.status(200).send('Webhook forwarded successfully.');
     } catch (error) {
