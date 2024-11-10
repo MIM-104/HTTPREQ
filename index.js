@@ -8,7 +8,7 @@ app.use(express.json());
 const encryptionKey = process.env.ENCRYPTION_KEY;
 
 function decrypt(encryptedData) {
-    const decipher = crypto.createDecipheriv('aes-256-cbc', encryptionKey, Buffer.alloc(16, 0)); // Adjust IV as per your encryption scheme
+    const decipher = crypto.createDecipheriv('aes-256-cbc', encryptionKey, Buffer.alloc(16, 0));
     let decrypted = decipher.update(encryptedData, 'base64', 'utf8');
     decrypted += decipher.final('utf8');
     return JSON.parse(decrypted);
