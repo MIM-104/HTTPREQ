@@ -2,12 +2,7 @@ const express = require('express');
 const fetch = require('node-fetch');
 const crypto = require('crypto');
 const app = express();
-app.use(express.json());
-
-const key = process.env.ENCRYPTION_KEY;
-const iv = process.env.ENCRYPTION_IV;
-const discordWebhookUrl = process.env.DISCORD_WEBHOOK_URL; // For Moderator Join
-const discordWebhookUrl2 = process.env.DISCORD_WEBHOOK2_URL; // For Moderator Messages
+app.use(express.json({ limit: '10mb', strict: false }));  // Increased limit and relaxed JSON parsing
 
 function decrypt(encryptedText) {
     try {
@@ -21,32 +16,46 @@ function decrypt(encryptedText) {
     }
 }
 
-// Handle POST requests at root path
 app.post('/', async (req, res) => {
     console.log('Received request at root path');
-    console.log('Request body:', JSON.stringify(req.body, null, 2));
+    console.log('Request headers:', req.headers);
+    console.log('Raw body:', req.body);
     
     try {
-        const encryptedPayload = req.body.data;
-        if (!encryptedPayload || typeof encryptedPayload !== 'string') {
-            console.error('Invalid payload:', req.body);
-            return res.status(400).send('Invalid encrypted data');
+        // Check if request body exists
+        if (!req.body) {
+            console.error('No request body received');
+            return res.status(400).send('No request body');
         }
 
-        console.log('Encrypted payload received');
+        const encryptedPayload = req.body.data;
         
+        // Log the type and content of the payload
+        console.log('Payload type:', typeof encryptedPayload);
+        console.log('Payload content:', encryptedPayload);
+
+        if (!encryptedPayload || typeof encryptedPayload !== 'string') {
+            console.error('Invalid payload format:', req.body);
+            return res.status(400).send('Invalid payload format');
+        }
+
         try {
             const decryptedData = decrypt(encryptedPayload);
             console.log('Decrypted data:', decryptedData);
             
-            const jsonPayload = JSON.parse(decryptedData);
-            console.log('Parsed JSON payload:', jsonPayload);
+            let jsonPayload;
+            try {
+                jsonPayload = JSON.parse(decryptedData);
+            } catch (parseErr) {
+                console.error('JSON parsing failed:', parseErr);
+                return res.status(400).send('Invalid JSON in decrypted data');
+            }
             
             const webhookData = jsonPayload.data;
             const webhookUrl = jsonPayload.event === 'mod_join' ? discordWebhookUrl : discordWebhookUrl2;
             
-            console.log('Using webhook URL:', webhookUrl);
-            console.log('Sending webhook data:', JSON.stringify(webhookData, null, 2));
+            console.log('Webhook URL:', webhookUrl);
+            console.log('Webhook data:', JSON.stringify(webhookData, null, 2));
 
             const discordResponse = await fetch(webhookUrl, {
                 method: 'POST',
@@ -54,38 +63,34 @@ app.post('/', async (req, res) => {
                 body: JSON.stringify(webhookData)
             });
 
-            const responseText = await discordResponse.text();
-            console.log('Discord response:', discordResponse.status, responseText);
-
             if (!discordResponse.ok) {
-                console.error(`Failed to send to Discord: ${discordResponse.status} ${discordResponse.statusText}`);
-                return res.status(500).send('Failed to forward to Discord');
+                console.error('Discord API error:', {
+                    status: discordResponse.status,
+                    statusText: discordResponse.statusText,
+                    body: await discordResponse.text()
+                });
+                return res.status(502).send('Failed to forward to Discord');
             }
             
-            console.log(`Successfully forwarded ${jsonPayload.event} event to Discord`);
-            res.status(200).send('Webhook forwarded successfully.');
+            console.log('Successfully forwarded event to Discord');
+            res.status(200).send('Success');
         } catch (err) {
-            console.error('Decryption or parsing failed:', err);
-            return res.status(400).send('Invalid data or failed to parse decrypted payload');
+            console.error('Processing error:', err);
+            return res.status(400).send(err.message);
         }
     } catch (error) {
-        console.error('Error forwarding webhook:', error);
-        res.status(500).send('Error processing webhook');
+        console.error('Server error:', error);
+        res.status(500).send('Internal server error');
     }
 });
 
-// Simple health check endpoint
-app.get('/', (req, res) => {
-    res.send('Server is running');
-});
-
-// Log environment variables (excluding sensitive values)
-console.log('Environment check:', {
-    'DISCORD_WEBHOOK_URL exists': !!process.env.DISCORD_WEBHOOK_URL,
-    'DISCORD_WEBHOOK2_URL exists': !!process.env.DISCORD_WEBHOOK2_URL,
-    'ENCRYPTION_KEY exists': !!process.env.ENCRYPTION_KEY,
-    'ENCRYPTION_IV exists': !!process.env.ENCRYPTION_IV
-});
-
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+    console.log('Environment variables loaded:', {
+        DISCORD_WEBHOOK_URL: !!process.env.DISCORD_WEBHOOK_URL,
+        DISCORD_WEBHOOK2_URL: !!process.env.DISCORD_WEBHOOK2_URL,
+        ENCRYPTION_KEY: !!process.env.ENCRYPTION_KEY,
+        ENCRYPTION_IV: !!process.env.ENCRYPTION_IV
+    });
+});
