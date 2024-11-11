@@ -1,9 +1,12 @@
 require('dotenv').config();
 const express = require('express');
+const axios = require('axios');
 const app = express();
 app.use(express.json());
 
 const shift = parseInt(process.env.ENCRYPTION_KEY);
+const joinWebhookUrl = process.env.JOIN_WEBHOOK_URL;
+const logsWebhookUrl = process.env.LOGS_WEBHOOK_URL;
 
 function caesarDecrypt(text, shift) {
     let result = '';
@@ -23,13 +26,26 @@ function caesarDecrypt(text, shift) {
     return JSON.parse(result);
 }
 
-app.post('/', (req, res) => {
+app.post('/', async (req, res) => {
     try {
         const encryptedPayload = req.body.data;
         const decryptedMessage = caesarDecrypt(encryptedPayload, shift);
 
         console.log("Decrypted message:", decryptedMessage);
-        res.status(200).send("Decrypted successfully");
+
+        let webhookUrl;
+        if (decryptedMessage.identifier === "join") {
+            webhookUrl = joinWebhookUrl;
+        } else if (decryptedMessage.identifier === "logs") {
+            webhookUrl = logsWebhookUrl;
+        } else {
+            res.status(400).send("Unknown identifier");
+            return;
+        }
+
+        await axios.post(webhookUrl, decryptedMessage);
+        res.status(200).send("Notification sent successfully");
+
     } catch (error) {
         console.error("Error processing request:", error.message);
         res.status(500).send("Failed to process notification");
