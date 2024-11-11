@@ -3,7 +3,7 @@ const express = require('express');
 const app = express();
 app.use(express.json());
 
-const shift = parseInt(process.env.ENCRYPTION_KEY) || 3;
+const shift = parseInt(process.env.ENCRYPTION_KEY);
 
 function caesarDecrypt(text, shift) {
     let result = '';
