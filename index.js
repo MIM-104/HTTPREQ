@@ -22,16 +22,25 @@ function decrypt(text, key) {
 app.post('/', async (req, res) => {
     try {
         const encryptedPayload = req.body.data;
-        
+
         if (!encryptedPayload) {
-            res.status(400).send("Missing encrypted payload");
-            return;
+            return res.status(400).send("Missing encrypted payload");
         }
 
         const decryptedText = decrypt(encryptedPayload, shift);
-        const decryptedMessage = JSON.parse(decryptedText);
-        
+
+        let decryptedMessage;
+        try {
+            decryptedMessage = JSON.parse(decryptedText);
+        } catch (error) {
+            return res.status(400).send("Invalid JSON format in decrypted message");
+        }
+
         console.log("Decrypted message:", decryptedMessage);
+
+        if (!decryptedMessage.identifier || !decryptedMessage.content) {
+            return res.status(400).send("Invalid decrypted message format");
+        }
 
         let webhookUrl;
         if (decryptedMessage.identifier === "join") {
@@ -39,18 +48,17 @@ app.post('/', async (req, res) => {
         } else if (decryptedMessage.identifier === "logs") {
             webhookUrl = logsWebhookUrl;
         } else {
-            res.status(400).send("Unknown identifier");
-            return;
+            return res.status(400).send("Unknown identifier");
         }
 
         await axios.post(webhookUrl, {
             content: decryptedMessage.content,
-            embeds: decryptedMessage.embeds
+            embeds: decryptedMessage.embeds || []
         });
 
         res.status(200).send("Notification sent successfully");
     } catch (error) {
-        console.error("Error processing request:", error);
+        console.error("Error processing request:", error.stack);
         res.status(500).send(`Failed to process notification: ${error.message}`);
     }
 });
