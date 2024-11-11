@@ -1,52 +1,35 @@
+require('dotenv').config();
 const express = require('express');
-const crypto = require('crypto');
-const axios = require('axios');
-
 const app = express();
 app.use(express.json());
 
-const encryptionKey = process.env.ENCRYPTION_KEY || "vVx~D)V0(77jKF~Fv)3uBnDK.yKejleY";
-const iv = Buffer.alloc(16, 0);
+const shift = parseInt(process.env.ENCRYPTION_KEY) || 3;
 
-function decrypt(encryptedData) {
-    const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(encryptionKey, 'utf8'), iv);
-    let decrypted = decipher.update(encryptedData, 'base64', 'utf8');
-    decrypted += decipher.final('utf8');
-    return JSON.parse(decrypted);
+function caesarDecrypt(text, shift) {
+    let result = '';
+    shift = shift % 26;
+
+    for (let i = 0; i < text.length; i++) {
+        let char = text[i];
+        let code = text.charCodeAt(i);
+
+        if (code >= 65 && code <= 90) {
+            char = String.fromCharCode(((code - 65 - shift + 26) % 26) + 65);
+        } else if (code >= 97 && code <= 122) {
+            char = String.fromCharCode(((code - 97 - shift + 26) % 26) + 97);
+        }
+        result += char;
+    }
+    return JSON.parse(result);
 }
 
-app.post('/', async (req, res) => {
+app.post('/', (req, res) => {
     try {
-        console.log("Request body:", req.body);
-
         const encryptedPayload = req.body.data;
+        const decryptedMessage = caesarDecrypt(encryptedPayload, shift);
 
-        if (!encryptedPayload) {
-            throw new Error("Missing encrypted data in the request body");
-        }
-
-        const decryptedMessage = decrypt(encryptedPayload);
         console.log("Decrypted message:", decryptedMessage);
-
-        const { identifier, content, embeds } = decryptedMessage;
-        let discordWebhookUrl = "";
-
-        if (identifier === "join") {
-            discordWebhookUrl = process.env.JOIN_WEBHOOK_URL;
-        } else if (identifier === "logs") {
-            discordWebhookUrl = process.env.LOGS_WEBHOOK_URL;
-        }
-
-        if (!discordWebhookUrl) {
-            throw new Error("Invalid identifier or missing webhook URL");
-        }
-
-        await axios.post(discordWebhookUrl, {
-            content: content || null,
-            embeds: embeds || []
-        });
-
-        res.status(200).send("Notification sent successfully");
+        res.status(200).send("Decrypted successfully");
     } catch (error) {
         console.error("Error processing request:", error.message);
         res.status(500).send("Failed to process notification");
