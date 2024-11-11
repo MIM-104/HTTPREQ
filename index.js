@@ -5,10 +5,11 @@ const axios = require('axios');
 const app = express();
 app.use(express.json());
 
-const encryptionKey = process.env.ENCRYPTION_KEY;
+const encryptionKey = process.env.ENCRYPTION_KEY || "vVx~D)V0(77jKF~Fv)3uBnDK.yKejleY";
+const iv = Buffer.alloc(16, 0);
 
 function decrypt(encryptedData) {
-    const decipher = crypto.createDecipheriv('aes-256-cbc', encryptionKey, Buffer.alloc(16, 0));
+    const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(encryptionKey, 'utf8'), iv);
     let decrypted = decipher.update(encryptedData, 'base64', 'utf8');
     decrypted += decipher.final('utf8');
     return JSON.parse(decrypted);
@@ -25,6 +26,7 @@ app.post('/', async (req, res) => {
         }
 
         const decryptedMessage = decrypt(encryptedPayload);
+        console.log("Decrypted message:", decryptedMessage);
 
         const { identifier, content, embeds } = decryptedMessage;
         let discordWebhookUrl = "";
@@ -33,6 +35,10 @@ app.post('/', async (req, res) => {
             discordWebhookUrl = process.env.JOIN_WEBHOOK_URL;
         } else if (identifier === "logs") {
             discordWebhookUrl = process.env.LOGS_WEBHOOK_URL;
+        }
+
+        if (!discordWebhookUrl) {
+            throw new Error("Invalid identifier or missing webhook URL");
         }
 
         await axios.post(discordWebhookUrl, {
