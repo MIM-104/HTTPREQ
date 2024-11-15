@@ -21,8 +21,8 @@ const createJoinEmbed = (player) => {
         title: "Details",
         color: 3932,
         fields: [
-            { name: "Place Id", value: `\`${player.placeId}\`` },
-            { name: "Job Id", value: `\`${player.jobId}\`` },
+            { name: "Place Id", value: `\`${player.placeId}\``, inline: true },
+            { name: "Job Id", value: `\`${player.jobId}\``, inline: true },
             { name: "Server Link", value: `\`roblox://experiences/start?placeId=${player.placeId}&gameInstanceId=${player.jobId}\`` },
             { name: "Moderator Details", value: `\`${player.displayName} (@${player.username})\`\n\`User ID: ${player.userId}\`\n\`Account Age: ${player.accountAge} days\`` }
         ],
@@ -37,6 +37,7 @@ const createJoinEmbed = (player) => {
 
 const sendWebhook = async (url, payload) => {
     try {
+        console.log('Sending webhook with payload:', JSON.stringify(payload, null, 2));
         const response = await fetch(url, {
             method: 'POST',
             headers: {
@@ -44,11 +45,12 @@ const sendWebhook = async (url, payload) => {
             },
             body: JSON.stringify(payload)
         });
-
+        
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            const text = await response.text();
+            throw new Error(`HTTP error! status: ${response.status}, body: ${text}`);
         }
-
+        
         return true;
     } catch (error) {
         console.error('Failed to send webhook:', error);
@@ -57,15 +59,20 @@ const sendWebhook = async (url, payload) => {
 };
 
 app.post('/', async (req, res) => {
+    console.log('Received request:', JSON.stringify(req.body, null, 2));
+    
     const { identifier, data } = req.body;
-
+    
     if (!identifier || !data) {
-        return res.status(400).json({ error: 'Missing required fields' });
+        return res.status(400).json({ 
+            error: 'Missing required fields',
+            received: req.body 
+        });
     }
-
+    
     let webhookPayload;
     let webhookUrl;
-
+    
     switch (identifier) {
         case 'join':
             webhookUrl = JOIN_WEBHOOK_URL;
@@ -73,18 +80,19 @@ app.post('/', async (req, res) => {
                 embeds: [createJoinEmbed(data)]
             };
             break;
-
         case 'logs':
             webhookUrl = LOGS_WEBHOOK_URL;
             webhookPayload = {
                 content: `${data.role} ${data.displayName} (@${data.username}): ${data.message}`
             };
             break;
-
         default:
-            return res.status(400).json({ error: 'Invalid identifier' });
+            return res.status(400).json({ 
+                error: 'Invalid identifier',
+                received: identifier 
+            });
     }
-
+    
     const success = await sendWebhook(webhookUrl, webhookPayload);
     
     if (success) {
@@ -92,6 +100,15 @@ app.post('/', async (req, res) => {
     } else {
         res.status(500).json({ error: 'Failed to send webhook' });
     }
+});
+
+// Add error handling middleware
+app.use((err, req, res, next) => {
+    console.error('Error:', err);
+    res.status(500).json({ 
+        error: 'Internal server error',
+        message: err.message 
+    });
 });
 
 const PORT = process.env.PORT || 3000;
