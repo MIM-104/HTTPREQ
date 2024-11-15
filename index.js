@@ -102,7 +102,6 @@ app.post('/', async (req, res) => {
     }
 });
 
-// Add error handling middleware
 app.use((err, req, res, next) => {
     console.error('Error:', err);
     res.status(500).json({ 
