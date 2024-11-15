@@ -59,7 +59,7 @@ const sendWebhook = async (url, payload) => {
 };
 
 app.post('/', async (req, res) => {
-    console.log('Received request:', JSON.stringify(req.body, null, 2));
+    console.log('Received request:', req.body, res);
     
     const { identifier, data } = req.body;
     
