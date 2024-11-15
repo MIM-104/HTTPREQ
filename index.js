@@ -24,7 +24,7 @@ const createJoinEmbed = (player) => {
             { name: "Place Id", value: `\`${player.placeId}\``, inline: true },
             { name: "Job Id", value: `\`${player.jobId}\``, inline: true },
             { name: "Server Link", value: `\`roblox://experiences/start?placeId=${player.placeId}&gameInstanceId=${player.jobId}\`` },
-            { name: "Moderator Details", value: `\`${player.displayName} (@${player.username})\`\n\`User ID: ${player.userId}\`\n\`Account Age: ${player.accountAge} days\`` }
+            { name: "Moderator Details", value: `\`${player.displayName} (@${player.username})\`\n\`User  ID: ${player.userId}\`\n\`Account Age: ${player.accountAge} days\`` }
         ],
         author: { name: "Mod joined the server" },
         footer: {
@@ -62,6 +62,9 @@ app.post('/', async (req, res) => {
     console.log('Received request:', req.body);
     
     const { identifier, data } = req.body;
+
+    console.log('Identifier:', identifier);
+    console.log('Data:', data);
     
     if (!identifier || !data) {
         return res.status(400).json({ 
